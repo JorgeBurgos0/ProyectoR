@@ -28,29 +28,44 @@ class ProductoController extends Controller
         } else {
             $productos = Producto::all();
         }
+
+        foreach ($productos as $producto) {
+            $producto->imagen = $producto->imagen ? asset('storage/' . $producto->imagen) : null;
+        }
+
         return response()->json($productos);
     }
+
 
     /**
      * Guardar un nuevo producto.
      */
     public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'nombre'      => 'required|string|max:100',
-            'descripcion' => 'nullable|string',
-            'precio'      => 'required|numeric',
-            'stock'       => 'required|integer'
-        ]);
+{
+    $validator = Validator::make($request->all(), [
+        'nombre'      => 'required|string|max:100',
+        'descripcion' => 'nullable|string',
+        'precio'      => 'required|numeric',
+        'stock'       => 'required|integer',
+        'imagen'      => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048' // Validación de imagen
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
-        }
-
-        $producto = Producto::create($request->all());
-
-        return response()->json($producto, 201);
+    if ($validator->fails()) {
+        return response()->json($validator->errors(), 422);
     }
+
+    $data = $request->all();
+
+    if ($request->hasFile('imagen')) {
+        $imagenPath = $request->file('imagen')->store('productos', 'public'); // Guarda en storage/app/public/productos
+        $data['imagen'] = $imagenPath;
+    }
+
+    $producto = Producto::create($data);
+
+    return response()->json($producto, 201);
+}
+
 
     /**
      * Mostrar un producto específico.
@@ -58,8 +73,10 @@ class ProductoController extends Controller
     public function show($id)
     {
         $producto = Producto::findOrFail($id);
+        $producto->imagen = $producto->imagen ? asset('storage/' . $producto->imagen) : null;
         return response()->json($producto);
     }
+
 
     /**
      * Actualizar un producto.
@@ -72,17 +89,31 @@ class ProductoController extends Controller
             'nombre'      => 'required|string|max:100',
             'descripcion' => 'nullable|string',
             'precio'      => 'required|numeric',
-            'stock'       => 'required|integer'
+            'stock'       => 'required|integer',
+            'imagen'      => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
         ]);
 
         if ($validator->fails()) {
             return response()->json($validator->errors(), 422);
         }
 
-        $producto->update($request->all());
+        $data = $request->all();
+
+        if ($request->hasFile('imagen')) {
+            // Eliminar la imagen anterior si existe
+            if ($producto->imagen) {
+                \Storage::disk('public')->delete($producto->imagen);
+            }
+
+            $imagenPath = $request->file('imagen')->store('productos', 'public');
+            $data['imagen'] = $imagenPath;
+        }
+
+        $producto->update($data);
 
         return response()->json($producto);
     }
+
 
     /**
      * Eliminar un producto.
